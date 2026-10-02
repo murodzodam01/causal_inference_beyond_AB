@@ -1,58 +1,122 @@
 # Causal Inference Beyond A/B Testing
 
-## Propensity-score matching and synthetic control
+Two observational case studies showing how causal questions can be approached when randomized experiments are unavailable.
 
-Two observational case studies explore how to construct counterfactuals when randomized experiments are unavailable: **UN interventions and conflict duration**, and **German reunification and GDP per capita**.
+This repository focuses on **propensity-score matching** and **synthetic control**, with particular attention to the diagnostics that determine whether a counterfactual comparison is credible.
 
-The project demonstrates treatment-assignment modeling, matching design, overlap and balance checks, matched outcome comparisons, constrained donor weighting, and placebo diagnostics. Its findings also show why predictive performance and a fitted counterfactual are not sufficient to establish causality.
+**Methods:** Propensity Scores · Matching · Overlap Diagnostics · Covariate Balance · Synthetic Control · Placebo Tests · Causal Identification
 
-**[Explore the notebook](Matching_and_Synthetic_Control.ipynb)** · [Data notes](data/README.md)
+[Open the notebook](Matching_and_Synthetic_Control.ipynb)
 
-## At a glance
+## Bottom line
 
-| | UN interventions | German reunification |
-|---|---|---|
-| Question | How does duration differ for treated snapshots with comparable controls? | How does West Germany's GDP path compare with a weighted donor path? |
-| Data | 1,227 snapshots; 16 treated observations | 748 country-year observations; 17 countries; 1960–2003 |
-| Methods | Logistic/RF propensity scores; nearest-neighbor matching; balance diagnostics | Unconstrained regression benchmark; constrained synthetic control; placebo comparisons |
-| Main saved finding | Logistic design matches 13 treated observations; forest matches none | GDP-fitted comparison assigns most weight to Austria and the USA |
-| Interpretation | Imprecise duration contrasts with residual imbalance | Post-cutoff path divergence; formal inference limited by the preserved implementation |
+### 1. Did UN intervention reduce conflict duration?
 
-## Case study 1 — Matching UN-intervention snapshots
+**No clear evidence.**
 
-The analysis uses 14 covariates to model UN intervention, constructs nearest-neighbor matches with replacement, and evaluates common support and standardized mean differences. It then compares designs requesting up to one, two, or three controls per treated observation.
+The matched estimates do not consistently show shorter conflicts after UN intervention, the estimates are imprecise, and several covariates remain materially imbalanced after matching.
 
-The fitted random forest perfectly predicts treatment **in sample**, but its treated scores (0.61–0.83) do not overlap with control scores (0–0.10). It produces zero matches. Logistic matching retains **13 of 16 treated observations**, although several covariates remain materially imbalanced.
+The logistic propensity-score design retains **13 of 16 treated observations**, while the fitted random forest produces **no usable matches** under the implemented caliper.
 
-![Original saved propensity-score overlap plots](figures/propensity_overlap.png)
+The strongest conclusion from this case is therefore methodological rather than substantive: **the available matched comparison is not strong enough to support a reliable causal claim that UN intervention reduced conflict duration.**
 
-### Saved outcome comparisons
+### 2. Did German reunification reduce West Germany's GDP per capita relative to its synthetic counterfactual?
 
-| Maximum controls per treated unit | Retained treated | Equal-treated matched contrast | Pooled regression contrast | Reported matched-set-clustered SE |
-|---|---:|---:|---:|---:|
-| 1 | 13 | −2.923 | −2.923 | 13.216 |
-| 2 | 13 | 1.846 | 0.529 | 12.994 |
-| 3 | 13 | 6.769 | 5.256 | 13.238 |
+**The saved analysis suggests yes, but not conclusively.**
 
-The values are in **months**: every `dur` value in the supplied file equals the calendar-month difference between its dates. Original figures retain “days” labels because code and outputs are preserved.
+The synthetic-control series tracks West Germany closely before the cutoff and lies above the observed West German GDP path in much of the post-cutoff period. The saved post-cutoff means are approximately **24,709 for West Germany** and **26,378 for the synthetic comparison**.
 
-The pair-average and regression estimates differ when matched sets contain different numbers of controls. The reported regression intervals all include zero. Those intervals are not a definitive inference result: controls can be reused across matched sets, source conflicts contribute repeated snapshots, and important imbalance remains.
+This pattern is consistent with a negative post-reunification GDP effect relative to the estimated counterfactual. However, the original implementation has important limitations, including fitting through 1990, optimizing on the GDP trajectory only, and a date mismatch in one saved placebo-style calculation.
 
-**Design lesson:** successful treatment classification does not establish a usable causal comparison. Overlap, balance, sample retention, and the dependence structure matter separately.
+The result should therefore be interpreted as **suggestive evidence rather than a definitive causal estimate**.
 
-## Case study 2 — A synthetic comparison for West Germany
+---
 
-The notebook first fits unconstrained regression weights, then minimizes pre-cutoff GDP prediction error subject to nonnegative weights that sum to one. The constrained optimizer uses **only the GDP-per-capita trajectory**. Other predictors are inspected afterward, not included as optimized balance targets.
+## Why this project matters
 
-The code fits through **1990 inclusive** and defines the post-period as **1991–2003**. This timing convention is retained and noted because reunification occurred during 1990.
+A/B tests are often the preferred way to estimate causal effects, but many real-world product, policy, and business questions cannot be randomized.
 
-![Original saved West Germany and synthetic-control trajectories](figures/synthetic_germany.png)
+This project explores two common alternatives:
 
-The plot contains GDP levels despite its retained “Gap in gdp” axis label.
+1. **Matching:** Can treated observations be compared with sufficiently similar untreated observations?
+2. **Synthetic control:** Can a weighted combination of untreated units approximate the counterfactual trajectory of a treated unit?
 
-### Saved donor weights
+The main lesson is that obtaining a numerical estimate is not enough. Credible causal analysis also depends on **overlap, balance, identification assumptions, counterfactual quality, and robustness diagnostics**.
 
-| Donor | Rounded weight |
+---
+
+## Case Study 1 — UN Interventions and Conflict Duration
+
+### Research question
+
+Did UN intervention reduce observed conflict duration relative to comparable untreated conflict snapshots?
+
+The dataset contains **1,227 conflict snapshots**, including **16 treated observations**.
+
+Because UN intervention is not randomly assigned, treated and untreated conflicts can differ systematically in severity, political context, geography, and other pre-treatment characteristics.
+
+### Approach
+
+The analysis:
+
+- models treatment assignment using logistic regression and a random forest;
+- estimates propensity scores;
+- evaluates common support between treated and untreated observations;
+- performs nearest-neighbor matching with a caliper;
+- checks covariate balance using standardized mean differences;
+- compares outcomes after matching;
+- examines sensitivity to the number of available controls.
+
+### Key findings
+
+The logistic propensity-score design retains **13 of 16 treated observations**.
+
+The fitted random forest separates treated and control observations so strongly that it produces **no usable matches** under the implemented caliper.
+
+The saved matched contrasts vary across specifications rather than pointing consistently in one direction, and the reported intervals include zero.
+
+This illustrates an important causal-design lesson:
+
+> **Better treatment prediction does not necessarily produce better causal comparisons.**
+
+A model can classify treatment extremely well while creating poor overlap between treatment groups, making counterfactual estimation difficult or impossible.
+
+Several covariates also remain materially imbalanced after matching. For that reason, the analysis does **not** support a strong causal conclusion that UN intervention reduced conflict duration.
+
+### What this case demonstrates
+
+- predictive accuracy and causal identification are different objectives;
+- overlap must be checked before estimating treatment effects;
+- propensity-score matching can change the target population by discarding treated units;
+- balance diagnostics remain necessary after matching;
+- small treated samples and repeated observations can substantially limit inference.
+
+---
+
+## Case Study 2 — German Reunification and Synthetic Control
+
+### Research question
+
+Did German reunification reduce West Germany's GDP-per-capita trajectory relative to a synthetic counterfactual constructed from other countries?
+
+The panel contains **17 countries observed from 1960 to 2003**.
+
+### Approach
+
+The analysis:
+
+- uses West Germany as the treated unit;
+- constructs an unconstrained regression benchmark;
+- estimates non-negative donor weights constrained to sum to one;
+- builds a synthetic comparison using the pre-cutoff GDP trajectory;
+- compares observed and synthetic GDP paths;
+- interprets donor contributions;
+- constructs country-placebo trajectories;
+- examines an earlier-cutoff diagnostic.
+
+### Main synthetic-control weights
+
+| Donor country | Approx. weight |
 |---|---:|
 | Austria | 0.29 |
 | USA | 0.27 |
@@ -61,59 +125,82 @@ The plot contains GDP levels despite its retained “Gap in gdp” axis label.
 | Switzerland | 0.08 |
 | France | 0.03 |
 
-Other donor weights round to zero. The unrounded weights sum to approximately one; rounded values sum to 0.99.
+The fitted synthetic series tracks West Germany closely in the pre-cutoff period and diverges more visibly afterward.
 
-The saved pre-cutoff GDP means are **8,566.45** for West Germany and **8,561.56** for the synthetic comparison. Post-cutoff means are **24,709.15** and **26,377.58**. These summarize the fitted paths, rather than independently validating a causal effect.
+The saved pre-cutoff GDP-per-capita means are approximately **8,566 for West Germany** and **8,562 for the synthetic comparison**. In the post-cutoff period, the corresponding means are approximately **24,709** and **26,378**.
 
-The notebook also constructs country-placebo trajectories and an earlier, 1975-cutoff fit. The main printed “year 2000” effect has a date mismatch: it subtracts the **2003 synthetic value** from observed **2000 GDP**. Its saved tail fraction of **0.0 is therefore not reported here as a valid permutation p-value**. The 1975-cutoff comparison is evaluated in 2000, after actual reunification, so it is not an entirely pre-treatment falsification test.
+This pattern is consistent with West Germany underperforming its synthetic counterfactual after reunification, but it is **not by itself proof of a causal effect**.
 
-**Design lesson:** close pre-period averages and a post-period gap are useful evidence to inspect, but credible inference also requires aligned dates, a defensible donor pool, suitable placebo comparisons, and stable counterfactual assumptions.
+### What this case demonstrates
 
-## Methods and implementation scope
+- construction of a counterfactual from a donor pool;
+- constrained optimization of synthetic-control weights;
+- interpretation of donor contributions;
+- comparison of pre- and post-treatment trajectories;
+- use of placebo-style diagnostics;
+- importance of treatment timing and correctly aligned comparison periods.
 
-| Implemented | Scope or limitation |
-|---|---|
-| Logistic and random-forest propensity estimation | Training-sample predictions; logistic score column is overwritten with earlier scikit-learn predictions |
-| Caliper matching with replacement | Logistic matching uses logit scores; forest matching uses raw probabilities |
-| SMDs and Love plots | Post-match treated SD is recomputed; several covariates remain imbalanced |
-| Matched outcome comparisons | Target is the retained treated snapshots, not all interventions |
-| Matched-set-clustered regression | Shared controls and repeated source periods are not fully represented by those cluster IDs |
-| Constrained synthetic control | GDP-only optimization; no entropy-balancing implementation |
-| Placebo diagnostics | Saved date and comparison limitations prevent strong formal significance claims |
+---
 
-No bootstrap, entropy-balancing model, or corrected reanalysis is claimed. These are possible future extensions rather than completed features.
+## Important interpretation notes
 
-## Repository contents
+This repository preserves the original analysis code and saved outputs from a university project while improving the explanatory narrative.
 
-| Path | Contents |
-|---|---|
-| `Matching_and_Synthetic_Control.ipynb` | Revised English narrative with all original code and outputs |
-| `data/war_pre_snapshots.dta` | Supplied conflict snapshot data, unchanged |
-| `data/repgermany.dta` | Supplied country panel, unchanged |
-| `data/README.md` | Dataset structure, field caveats, and provenance |
-| `figures/` | Two images copied directly from saved notebook outputs |
-| `requirements.txt` | Unpinned package list for the existing imports |
+Several implementation details limit the strength of causal claims:
 
-## Viewing and local setup
+- the matching analysis has only **16 treated observations** and retains 13 after matching;
+- meaningful post-match covariate imbalance remains;
+- the random-forest propensity model is evaluated in sample and should not be interpreted as a superior causal design;
+- one balance diagnostic includes an outcome-derived interaction term and should not be interpreted as a pre-treatment covariate diagnostic;
+- the synthetic-control implementation optimizes on the **GDP trajectory only**;
+- the original synthetic-control code fits through **1990 inclusive**;
+- one saved "year 2000" calculation uses the 2003 synthetic value, so it should not be interpreted as a valid permutation p-value;
+- the earlier-cutoff diagnostic is partly evaluated after the actual reunification event.
 
-The notebook contains saved figures and tables and can be reviewed on GitHub without execution. All results reported here come from those existing outputs; models were not rerun for this edition.
+These limitations are intentionally documented rather than hidden. They illustrate why causal inference requires scrutiny of the research design, not just model output.
 
-For local use, keep the directory structure intact so the original `data/...` paths resolve. The notebook imports `rpy2`, so a compatible **R installation** is required in addition to Python packages. `pip` alone does not install R.
+---
 
-```bash
-python -m pip install -r requirements.txt
-python -m jupyterlab
+## Repository structure
+
+```text
+.
+├── Matching_and_Synthetic_Control.ipynb
+├── README.md
+└── data/
+    ├── repgermany.dta
+    └── war_pre_snapshots.dta
 ```
 
-Open the notebook from the repository root. The original environment is not fully specified, so dependencies are unpinned and a successful fresh run is not claimed. Saved warnings remain visible. The existing notebook also changes the process-wide SSL context and requests eight parallel workers; these settings are unchanged, not recommendations of this README.
+---
 
-## Preservation and attribution
+## Tools
 
-This is a **presentation-only portfolio edition** of a collaborative university project. Only Markdown cells and documentation were revised. Every original code cell—including code comments, outputs, warnings, execution counts, and metadata—was compared for exact equality against the supplied notebook. Both data files are byte-identical copies. No models were rerun and no saved results were replaced.
+Python · pandas · NumPy · scikit-learn · statsmodels · SciPy · DuckDB · matplotlib · seaborn · joblib · rpy2
 
-**Contributors:** Jonathan Sauer, Muhammad Murodzoda, Sebastian Aguilar.  
-**Portfolio presentation:** Muhammad Murodzoda.
+> The notebook imports `rpy2`, so reproducing the full environment requires a compatible R installation in addition to the Python dependencies.
 
-The conflict application cites Gilligan and Sergenti (2008), *Do UN Interventions Cause Peace? Using Matching to Improve Causal Inference*, [Quarterly Journal of Political Science](https://nowpublishers.com/article/Details/QJPS-7051). The synthetic-control code acknowledges Matheus Facure's [Causal Inference for the Brave and True](https://matheusfacure.github.io/python-causality-handbook/15-Synthetic-Control.html).
+---
 
-The data extracts were supplied with the notebook; their complete provenance and redistribution terms were not supplied. This project does not claim original data collection, exact replication of a published study, or a blanket license over third-party material.
+## Key causal-inference takeaways
+
+This project extends experimentation knowledge beyond randomized A/B tests and demonstrates how observational causal designs can be evaluated critically.
+
+In particular, it shows how to:
+
+- define a counterfactual when randomization is unavailable;
+- distinguish prediction from causal estimation;
+- diagnose overlap and balance before interpreting treatment effects;
+- construct and evaluate a synthetic comparison;
+- recognize when implementation or identification problems limit a causal claim;
+- communicate uncertainty rather than overstate results.
+
+---
+
+## References
+
+The conflict application references Gilligan and Sergenti (2008), *Do UN Interventions Cause Peace? Using Matching to Improve Causal Inference*.
+
+The synthetic-control implementation acknowledges Matheus Facure's *Causal Inference for the Brave and True*.
+
+The supplied datasets are included for the analysis; this repository does not claim original data collection.
